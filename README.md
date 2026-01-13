@@ -1,23 +1,20 @@
-![Delve](https://raw.githubusercontent.com/go-delve/delve/master/assets/delve_horizontal.png)
+**Go调试器delve支持32位进程调试。**
 
-[![license](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/go-delve/delve/master/LICENSE)
-[![Go Reference](https://pkg.go.dev/badge/github.com/go-delve/delve.svg)](https://pkg.go.dev/github.com/go-delve/delve)
-[![Build Status](https://delve.teamcity.com/app/rest/builds/buildType:(id:Delve_AggregatorBuild)/statusIcon.svg)](https://delve.teamcity.com/viewType.html?buildTypeId=Delve_AggregatorBuild&guest=1)
 
-The GitHub issue tracker is for **bugs** only. Please use the [developer mailing list](https://groups.google.com/forum/#!forum/delve-dev) for any feature proposals and discussions.
 
-### About Delve
+![image-20260110142536790](images/README/image-20260110142536790.png)
 
-- [Installation](Documentation/installation)
-- [Getting Started](Documentation/cli/getting_started.md)
-- [Documentation](Documentation)
-  - [Command line options](Documentation/usage/dlv.md)
-  - [Command line client](Documentation/cli/README.md)
-  - [Plugins and GUIs](Documentation/EditorIntegration.md)
-  - [Frequently Asked Questions](Documentation/faq.md)
-- [Contributing](CONTRIBUTING.md)
-  - [Internal Documentation](Documentation/internal)
-  - [API documentation](Documentation/api)
-  - [How to write a Delve client](Documentation/api/ClientHowto.md)
+原生的delve是不支持调试32位应用程序的，但是我的项目为了兼容32位Windows，需要32位编译，又需要调试，只能让delve支持32位了。
 
-Delve is a debugger for the Go programming language. The goal of the project is to provide a simple, full featured debugging tool for Go. Delve should be easy to invoke and easy to use. Chances are if you're using a debugger, things aren't going your way. With that in mind, Delve should stay out of your way as much as possible.
+
+
+
+
+**构建**
+
+在delve\cmd\dlv下执行命令powershell命令,
+
+```
+$env:GOARCH="386";go build -o dlv_32.exe .
+```
+
