@@ -2533,10 +2533,25 @@ func verifyBinaryFormat(exePath string) (string, error) {
 	default:
 		panic("attempting to open file Delve cannot parse")
 	}
-
 	if err != nil {
 		return "", api.ErrNotExecutable
 	}
+	if runtime.GOOS == "windows" {
+		var expectedMachineType = 0
+		switch runtime.GOARCH {
+		case "386":
+			expectedMachineType = pe.IMAGE_FILE_MACHINE_I386
+		case "amd64":
+			expectedMachineType = pe.IMAGE_FILE_MACHINE_AMD64
+		}
+
+		// 32位调试器只能调试32位,64位调试器只能调试64位
+		// 这里要暴露出来这个问题,因为他底层返回的错误你根本看不懂
+		if exe.(*pe.File).Machine != uint16(expectedMachineType) {
+			return "", fmt.Errorf("executable architecture mismatch with debugger")
+		}
+	}
+
 	exe.Close()
 	return fullpath, nil
 }
