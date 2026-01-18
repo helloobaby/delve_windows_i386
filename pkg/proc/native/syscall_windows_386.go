@@ -1,6 +1,8 @@
 package native
 
-import "github.com/go-delve/delve/pkg/proc/winutil"
+import (
+	"github.com/go-delve/delve/pkg/proc/winutil"
+)
 
 const (
 	_CONTEXT_i386            = 0x00010000
@@ -14,3 +16,10 @@ const (
 )
 
 type _CONTEXT = winutil.I386CONTEXT
+
+type _DEBUG_EVENT struct {
+	DebugEventCode uint32
+	ProcessId      uint32
+	ThreadId       uint32
+	U              [84]byte
+}
