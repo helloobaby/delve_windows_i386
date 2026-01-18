@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/go-delve/delve/pkg/logflags"
 	"github.com/go-delve/delve/pkg/proc"
 )
 
@@ -349,8 +350,11 @@ func (dbp *nativeProcess) initializeBasic() (string, error) {
 // initialize will ensure that all relevant information is loaded
 // so the process is ready to be debugged.
 func (dbp *nativeProcess) initialize(path string, debugInfoDirs []string) (*proc.TargetGroup, error) {
+	logger := logflags.DebuggerLogger()
+	logger.Infof("dbp detail: %#v", dbp)
 	cmdline, err := dbp.initializeBasic()
 	if err != nil {
+		logger.Errorf("dbp.initializeBasic: error %s", err.Error())
 		return nil, err
 	}
 	stopReason := proc.StopLaunched

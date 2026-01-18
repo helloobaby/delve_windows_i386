@@ -28,7 +28,6 @@ func (os *osProcessDetails) Close() {}
 // Launch creates and begins debugging a new process.
 func Launch(cmd []string, wd string, flags proc.LaunchFlags, _ []string, _ string, stdinPath string, stdoutOR proc.OutputRedirect, stderrOR proc.OutputRedirect) (*proc.TargetGroup, error) {
 	argv0Go := cmd[0]
-
 	env := proc.DisableAsyncPreemptEnv()
 
 	stdin, stdout, stderr, closefn, err := openRedirects(stdinPath, stdoutOR, stderrOR, true)
@@ -65,6 +64,7 @@ func Launch(cmd []string, wd string, flags proc.LaunchFlags, _ []string, _ strin
 
 	tgt, err := dbp.initialize(argv0Go, []string{})
 	if err != nil {
+		logflags.DebuggerLogger().Errorf("dbp.initialize: %v", err)
 		detachWithoutGroup(dbp, true)
 		return nil, err
 	}
@@ -72,6 +72,7 @@ func Launch(cmd []string, wd string, flags proc.LaunchFlags, _ []string, _ strin
 }
 
 func initialize(dbp *nativeProcess) (string, error) {
+	logger := logflags.DebuggerLogger()
 	// we need a fake procgrp to call waitForDebugEvent
 	procgrp := &processGroup{procs: []*nativeProcess{dbp}}
 	// It should not actually be possible for the
@@ -88,6 +89,7 @@ func initialize(dbp *nativeProcess) (string, error) {
 	}
 
 	cmdline := getCmdLine(dbp.os.hProcess)
+	logger.Infof("getCmdLine %v", cmdline)
 
 	// Suspend all threads so that the call to _ContinueDebugEvent will
 	// not resume the target.

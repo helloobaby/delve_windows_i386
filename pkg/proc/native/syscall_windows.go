@@ -123,14 +123,6 @@ func _NT_SUCCESS(x _NTSTATUS) bool {
 	return x >= 0
 }
 
-type _DEBUG_EVENT struct {
-	DebugEventCode uint32
-	ProcessId      uint32
-	ThreadId       uint32
-	_              uint32 // to align Union properly
-	U              [160]byte
-}
-
 //sys	_NtQueryInformationThread(threadHandle syscall.Handle, infoclass int32, info uintptr, infolen uint32, retlen *uint32) (status _NTSTATUS) = ntdll.NtQueryInformationThread
 //sys	_GetThreadContext(thread syscall.Handle, context *_CONTEXT) (err error) = kernel32.GetThreadContext
 //sys	_SetThreadContext(thread syscall.Handle, context *_CONTEXT) (err error) = kernel32.SetThreadContext

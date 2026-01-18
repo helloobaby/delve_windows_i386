@@ -144,6 +144,7 @@ var (
 	}
 
 	supportedWindowsArch = map[_PEMachine]bool{
+		_IMAGE_FILE_MACHINE_I386:  true,
 		_IMAGE_FILE_MACHINE_AMD64: true,
 		_IMAGE_FILE_MACHINE_ARM64: true,
 	}
@@ -1962,11 +1963,23 @@ func loadBinaryInfoPE(bi *BinaryInfo, image *Image, path string, entryPoint uint
 	if err != nil {
 		return err
 	}
-	opth := peFile.OptionalHeader.(*pe.OptionalHeader64)
+
+	var imageBase uint64
+	var dllChars uint16
+	switch h := peFile.OptionalHeader.(type) {
+	case *pe.OptionalHeader64:
+		imageBase = h.ImageBase
+		dllChars = h.DllCharacteristics
+	case *pe.OptionalHeader32:
+		imageBase = uint64(h.ImageBase)
+		dllChars = h.DllCharacteristics
+	default:
+		return fmt.Errorf("unsupported optional header type: %T", h)
+	}
 	if entryPoint != 0 {
-		image.StaticBase = entryPoint - opth.ImageBase
+		image.StaticBase = entryPoint - imageBase
 	} else {
-		if opth.DllCharacteristics&_IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE != 0 {
+		if dllChars&_IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE != 0 {
 			return ErrCouldNotDetermineRelocation
 		}
 	}

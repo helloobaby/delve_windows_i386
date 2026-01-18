@@ -21,3 +21,11 @@ const (
 // structure as _CONTEXT, but we need to have it in pkg/proc/winutil.CONTEXT
 // because it's also used on non-windows operating systems.
 type _CONTEXT = winutil.AMD64CONTEXT
+
+type _DEBUG_EVENT struct {
+	DebugEventCode uint32
+	ProcessId      uint32
+	ThreadId       uint32
+	_              uint32 // to align Union properly
+	U              [160]byte
+}
