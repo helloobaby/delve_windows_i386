@@ -3,10 +3,12 @@
 package winutil
 
 import (
-	"errors"
+	"encoding/binary"
+	"fmt"
 	"unsafe"
 
 	"github.com/go-delve/delve/pkg/dwarf/op"
+	"github.com/go-delve/delve/pkg/dwarf/regnum"
 	"github.com/go-delve/delve/pkg/proc"
 )
 
@@ -22,7 +24,7 @@ type FLOATING_SAVE_AREA struct {
 	Spare0        uint32
 }
 
-type I386CONTEXT struct { // 这个暂时跟操作系统的数据结构保持一致
+type I386CONTEXT struct { // 这个必须跟操作系统的C数据结构保持一致
 	ContextFlags uint32
 
 	// Debug registers
@@ -74,12 +76,6 @@ type I386Registers struct { // 定义为64位方便点
 
 	eip    uint64
 	eflags uint64
-	cs     uint64
-	ds     uint64
-	es     uint64
-	fs     uint64
-	gs     uint64
-	ss     uint64
 	tls    uint64
 
 	Context *I386CONTEXT
@@ -103,9 +99,70 @@ func (ctx *I386CONTEXT) SetTrap(trap bool) {
 }
 
 func (ctx *I386CONTEXT) SetReg(regNum uint64, reg *op.DwarfRegister) error {
-	return errors.New("Not Implemented")
+	var p *uint32
+
+	switch regNum {
+	case regnum.I386_Eax:
+		p = &ctx.Eax
+	case regnum.I386_Ecx:
+		p = &ctx.Ecx
+	case regnum.I386_Edx:
+		p = &ctx.Edx
+	case regnum.I386_Ebx:
+		p = &ctx.Ebx
+	case regnum.I386_Esp:
+		p = &ctx.Esp
+	case regnum.I386_Ebp:
+		p = &ctx.Ebp
+	case regnum.I386_Esi:
+		p = &ctx.Esi
+	case regnum.I386_Edi:
+		p = &ctx.Edi
+	case regnum.I386_Eip:
+		p = &ctx.Eip
+	case regnum.I386_Eflags:
+		p = &ctx.EFlags
+	case regnum.I386_Cs:
+		p = &ctx.SegCs
+	case regnum.I386_Ds:
+		p = &ctx.SegDs
+	case regnum.I386_Es:
+		p = &ctx.SegEs
+	case regnum.I386_Fs:
+		p = &ctx.SegFs
+	case regnum.I386_Gs:
+		p = &ctx.SegGs
+	case regnum.I386_Ss:
+		p = &ctx.SegSs
+	}
+	if p != nil {
+		// 校验字节长度，32位寄存器应该是 4 字节
+		// 注意：有些 DWARF 实现可能会传 8 字节，这里取低 32 位
+		if reg.Bytes != nil && len(reg.Bytes) != 4 && len(reg.Bytes) != 8 {
+			return fmt.Errorf("wrong number of bytes for register %d (%d)", regNum, len(reg.Bytes))
+		}
+		*p = uint32(reg.Uint64Val)
+		return nil
+	}
+
+	// 处理 XMM 寄存器 (I386 通常有 8 个 XMM 寄存器: XMM0-XMM7)
+	if regNum >= regnum.I386_XMM0 && regNum <= regnum.I386_XMM0+7 {
+		reg.FillBytes()
+		if len(reg.Bytes) > 16 {
+			return fmt.Errorf("too many bytes when setting register XMM%d", regNum-regnum.I386_XMM0)
+		}
+		// 计算在 ExtendedRegisters 中的偏移
+		// 注意：Windows I386CONTEXT 的浮点寄存器通常存在 ExtendedRegisters 字段中
+		// 具体的偏移量依赖于具体的结构体定义，以下是通用写法：
+		idx := (regNum - regnum.I386_XMM0) * 16
+		copy(ctx.ExtendedRegisters[idx:], reg.Bytes)
+		return nil
+	}
+
+	return fmt.Errorf("can not set register %d (unsupported or read-only)", regNum)
 }
 
+// 从系统标准的CONTEXT结构体转化
 func NewI386Registers(context *I386CONTEXT, TebBaseAddress uint64) *I386Registers {
 	regs := &I386Registers{
 		eax:    uint64(context.Eax), // Convert uint32 to uint64
@@ -118,13 +175,7 @@ func NewI386Registers(context *I386CONTEXT, TebBaseAddress uint64) *I386Register
 		esp:    uint64(context.Esp),
 		eip:    uint64(context.Eip),
 		eflags: uint64(context.EFlags), // 注意：原 AMD64 版本是 uint64(context.EFlags)，这里保持一致
-		cs:     uint64(context.SegCs),
-		ds:     uint64(context.SegDs), // Added DS, ES, SS as they exist in i386 context
-		es:     uint64(context.SegEs),
-		fs:     uint64(context.SegFs),
-		gs:     uint64(context.SegGs),
-		ss:     uint64(context.SegSs),
-		tls:    TebBaseAddress, // TLS (Thread Local Storage) often points to TEB (Thread Environment Block) on Windows
+		tls:    TebBaseAddress,         // TLS (Thread Local Storage) often points to TEB (Thread Environment Block) on Windows
 	}
 
 	// Note: If I386Registers has a floating-point state field (e.g., fltSave) similar to AMD64Registers,
@@ -168,7 +219,70 @@ func (r *I386Registers) GAddr() (uint64, bool) {
 }
 
 func (r *I386Registers) Slice(floatingPoint bool) ([]proc.Register, error) {
-	return nil, errors.New("Not implemented")
+	var regs = []struct {
+		k string
+		v uint64
+	}{
+		{"Eip", r.eip},
+		{"Esp", r.esp},
+		{"Eax", r.eax},
+		{"Ebx", r.ebx},
+		{"Ecx", r.ecx},
+		{"Edx", r.edx},
+		{"Edi", r.edi},
+		{"Esi", r.esi},
+		{"Ebp", r.ebp},
+		{"Eflags", r.eflags},
+		{"TLS", r.tls},
+	}
+
+	outlen := len(regs)
+	// 判断是否存在 Context 来提取浮点寄存器
+	hasFloat := floatingPoint && r.Context != nil
+	if hasFloat {
+		// 8个 ST 寄存器 + 8个 XMM 寄存器 + 状态寄存器
+		outlen += 8 + 8 + 8
+	}
+
+	out := make([]proc.Register, 0, outlen)
+	for _, reg := range regs {
+		out = proc.AppendUint64Register(out, reg.k, reg.v)
+	}
+
+	if hasFloat {
+		// 从 Context.ExtendedRegisters 中解析 FXSAVE 结构
+		// Windows I386CONTEXT 的 ExtendedRegisters 字段通常是 [512]byte
+		// 格式遵循 x86 FXSAVE 标准
+
+		f := r.Context.ExtendedRegisters // 假设类型是 [512]byte
+
+		// 辅助函数：从字节数组提取 uint16/uint32
+		get16 := func(off int) uint64 { return uint64(binary.LittleEndian.Uint16(f[off : off+2])) }
+		get32 := func(off int) uint64 { return uint64(binary.LittleEndian.Uint32(f[off : off+4])) }
+
+		out = proc.AppendUint64Register(out, "CW", get16(0))
+		out = proc.AppendUint64Register(out, "SW", get16(2))
+		out = proc.AppendUint64Register(out, "TW", uint64(f[4])) // Tag Word
+		out = proc.AppendUint64Register(out, "FOP", get16(6))
+		out = proc.AppendUint64Register(out, "FIP", get32(8))
+		out = proc.AppendUint64Register(out, "FDP", get32(16))
+		out = proc.AppendUint64Register(out, "MXCSR", get32(24))
+		out = proc.AppendUint64Register(out, "MXCSR_MASK", get32(28))
+
+		// 8个 ST 寄存器 (每个16字节，实际有效通常是10字节)
+		for i := 0; i < 8; i++ {
+			off := 32 + (i * 16)
+			out = proc.AppendBytesRegister(out, fmt.Sprintf("ST(%d)", i), f[off:off+10])
+		}
+
+		// 8个 XMM 寄存器 (每个16字节)
+		for i := 0; i < 8; i++ {
+			off := 160 + (i * 16)
+			out = proc.AppendBytesRegister(out, fmt.Sprintf("XMM%d", i), f[off:off+16])
+		}
+	}
+
+	return out, nil
 }
 
 func NewI386CONTEXT() *I386CONTEXT {
