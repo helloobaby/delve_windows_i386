@@ -4,7 +4,7 @@
 
 ![image-20260110142536790](images/README/image-20260110142536790.png)
 
-原生的delve是不支持调试32位应用程序的，但是我的项目为了兼容32位Windows，需要32位编译，又需要调试，只能让delve支持32位了。
+原生的delve是不支持调试32位应用程序的，这个项目给delve扩充了下功能，支持调试windows 32位应用。
 
 
 
@@ -18,3 +18,6 @@
 $env:GOARCH="386";go build -o dlv_32.exe .
 ```
 
+
+
+![image-20260122233343512](images/README/image-20260122233343512.png)

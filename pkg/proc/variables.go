@@ -12,6 +12,7 @@ import (
 	"math"
 	"math/bits"
 	"reflect"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -448,7 +449,7 @@ func getGVariable(thread Thread) (*Variable, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	//printGInfo(thread)
 	gaddr, hasgaddr := regs.GAddr()
 	if !hasgaddr {
 		bi := thread.BinInfo()
@@ -463,6 +464,31 @@ func getGVariable(thread Thread) (*Variable, error) {
 	}
 
 	return newGVariable(thread, gaddr, thread.BinInfo().Arch.DerefTLS())
+}
+
+func printGInfo(thread Thread) {
+	bi := thread.BinInfo()
+	regs, _ := thread.Registers()
+	offset, _ := bi.GStructOffset(thread.ProcessMemory())
+	fmt.Printf("g 结构偏移 offset %x\n", offset)
+	fmt.Printf("teb地址 %x\n", regs.TLS())
+	gaddr := uint64(0)
+	self := uint64(0) // teb里指向自己的字段
+	if runtime.GOARCH == "amd64" {
+		self, _ = readUintRaw(thread.ProcessMemory(), regs.TLS()+0x30, int64(bi.Arch.PtrSize()))
+		gaddr, _ = readUintRaw(thread.ProcessMemory(), regs.TLS()+offset, int64(bi.Arch.PtrSize()))
+	} else if runtime.GOARCH == "386" { // i386
+		self, _ = readUintRaw(thread.ProcessMemory(), regs.TLS()+0x18, int64(bi.Arch.PtrSize()))
+		gaddr, _ = readUintRaw(thread.ProcessMemory(), regs.TLS()+offset, int64(bi.Arch.PtrSize()))
+	}
+	// 这个self一定要等于regs.TLS()
+	// 说明返回正确的teb地址
+	fmt.Printf("teb Self字段值 %x\n", self)
+	fmt.Printf("指针大小 %d\n", bi.Arch.PtrSize())
+	fmt.Printf("读出来的g地址 gaddr %x \n", gaddr)
+	gType, _ := thread.BinInfo().findType("runtime.g")
+	fmt.Printf("g 类型是 %T", gType)
+	fmt.Println("")
 }
 
 func newGVariable(thread Thread, gaddr uint64, deref bool) (*Variable, error) {
@@ -882,7 +908,6 @@ func (v *Variable) parseG() (*G, error) {
 	mem := v.mem
 	gaddr := v.Addr
 	_, deref := v.RealType.(*godwarf.PtrType)
-
 	if deref {
 		var err error
 		gaddr, err = readUintRaw(mem, gaddr, int64(v.bi.Arch.PtrSize()))
@@ -1014,6 +1039,7 @@ func (v *Variable) parseG() (*G, error) {
 		variable:   v,
 		stack:      stack{hi: stackhi, lo: stacklo},
 	}
+	//fmt.Printf("g %#+v\n", g)
 	return g, nil
 }
 
