@@ -16,13 +16,16 @@ var i386BreakInstruction = []byte{0xCC}
 // struct.
 func I386Arch(goos string) *Arch {
 	return &Arch{
-		Name:                             "386",
-		ptrSize:                          4,
-		maxInstructionLength:             15,
-		breakpointInstruction:            i386BreakInstruction,
-		altBreakpointInstruction:         []byte{0xcd, 0x03},
-		breakInstrMovesPC:                true,
-		derefTLS:                         false,
+		Name:                     "386",
+		ptrSize:                  4,
+		maxInstructionLength:     15,
+		breakpointInstruction:    i386BreakInstruction,
+		altBreakpointInstruction: []byte{0xcd, 0x03},
+		breakInstrMovesPC:        true,
+		//.text:00446330                 mov     ecx, runtime_tls_g (GStructOffset)
+		//.text:00446336                 mov     ecx, fs:[ecx]
+		// 我看汇编代码,这个derefTLS应该也是要true
+		derefTLS:                         true,
 		prologues:                        prologuesI386,
 		fixFrameUnwindContext:            i386FixFrameUnwindContext,
 		switchStack:                      i386SwitchStack,
