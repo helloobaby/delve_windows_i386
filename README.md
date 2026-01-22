@@ -21,3 +21,11 @@ $env:GOARCH="386";go build -o dlv_32.exe .
 
 
 ![image-20260122233343512](images/README/image-20260122233343512.png)
+
+
+
+**2026/1/13** 能够32位编译delve
+
+**2026/1/18** 提升32位兼容性
+
+**2026/1/22** 替换goland原生delve基本功能能正常用
