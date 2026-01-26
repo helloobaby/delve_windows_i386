@@ -1785,13 +1785,7 @@ func (bi *BinaryInfo) setGStructOffsetPE(entryPoint uint64, peFile *pe.File) {
 		bi.gStructOffsetIsPtr = true
 	case _IMAGE_FILE_MACHINE_I386:
 		// https://go.dev/src/runtime/cgo/gcc_windows_386.c
-		producer := bi.Producer()
-		if producer != "" && goversion.ProducerAfterOrEqual(producer, 1, 20) {
-			bi.gStructOffset = readtls_g()
-			bi.gStructOffsetIsPtr = true
-		} else {
-			bi.gStructOffset = 0x14
-		}
+		bi.gStructOffset = 0x14
 	}
 }
 
